@@ -2,6 +2,7 @@ from flask import Flask,request
 from flask_restful import Api, Resource, reqparse
 import mysql.connector
 import numpy as np
+import json
 
 app = Flask(__name__)
 api = Api(app)
@@ -77,10 +78,10 @@ def distancia(lat1,lon1,lat2,lon2):
 
 
 connectdb = mysql.connector.connect(
-  host="XXXXXXXXXX",
+  host="xxxxxxxx",
   port="3306",
   user="admin",
-  passwd="XXXXXXXXXX",
+  passwd="xxxxxxxxx",
   database="faster"
 )
 
@@ -94,10 +95,35 @@ class Hospitales(Resource):
         hosp = sorted(hosp, key=lambda x: x["distancia"])
         return hosp,200
 
+class HospitalesSintomas(Resource):
+
+    def post(self):
+
+        parser = reqparse.RequestParser()
+        parser.add_argument("lat")
+        parser.add_argument("lng")
+        parser.add_argument("result")
+        args = parser.parse_args()
+        lat=args["lat"]
+        lang=args["lng"]
+        j=json.loads(args["result"].replace("\'","\""))["parameters"]
+        sintomas = j["sintoma"]
+        edad = j["edad"]
+
+        global connectdb
+        hosp = getHospitalesFull(connectdb)
+        for h in hosp:
+            dis = distancia(float(lat),float(lang), h["lat"], h["lng"])
+            h["distancia"]=dis
+        hosp = sorted(hosp, key=lambda x: x["distancia"])
+
+        return (lat,lang,sintomas,edad),201
+
 @app.after_request
 def add_security_headers(resp):
     resp.headers['Access-Control-Allow-Origin']='*'
     return resp
 
 api.add_resource(Hospitales,"/hospitales/<lat>/<lang>")
+api.add_resource(HospitalesSintomas,"/hospitales/sintomas")
 app.run(host="0.0.0.0",debug=True)
