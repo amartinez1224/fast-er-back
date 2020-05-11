@@ -134,7 +134,7 @@ class HospitalesSintomas(Resource):
         for h in hosp:
             dis = distancia(float(lat),float(lang), h["lat"], h["lng"])
             h["distancia"]=dis
-        hosp = sorted(hosp, key=lambda x: x["distancia"])[:8]
+        hosp = sorted(hosp, key=lambda x: x["distancia"])[:6]
 
         palabras = []
         [palabras.extend(s.lower().split(" ")) for s in sintomas]
@@ -155,16 +155,16 @@ class HospitalesSintomas(Resource):
 
             especialidad=max(set(especialidades), key = especialidades.count)
 
-
             second=[]
             for h in hosp:
                 esp = getEspecialidadesHospital(connectdb,h["id"])
+                print(esp)
 
-                if especialidad not in h:
+                if especialidad not in [e[0] for e in esp]:
                     second.append(h)
-                    hosp.remove(h)
-            hosp.extend(second)
 
+            hosp = [h for h in hosp if h not in second]
+            hosp.extend(second)
 
         return hosp,201
 
