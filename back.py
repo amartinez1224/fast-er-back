@@ -3,9 +3,9 @@ from flask_restful import Api, Resource, reqparse
 import mysql.connector
 import numpy as np
 import json
+from difflib import SequenceMatcher
 
-app = Flask(__name__)
-api = Api(app)
+
 
 def getHospitales(connectdb):
     hospitales=[]
@@ -66,19 +66,38 @@ def getEspecialidadesHospital(connectdb,id):
         esp.append(e)
     return esp
 
+def getEspecialidadesSintomas(connectdb, id):
+    hospEsp=[]
+    db = connectdb.cursor()
+    db.execute("SELECT * FROM especialidadesSin WHERE idSintoma = "+str(id))
+    result = db.fetchall()
+    for he in result:
+        hospEsp.append(he)
+    return hospEsp
+
+def getSintomas(connectdb):
+    especialidades=[]
+    db = connectdb.cursor()
+    db.execute("SELECT * FROM sintomas")
+    result = db.fetchall()
+    for e in result:
+        especialidades.append(e)
+    return especialidades
+
 def distancia(lat1,lon1,lat2,lon2):
-  R = 6371
-  dLat = np.radians(lat2-lat1)
-  dLon = np.radians(lon2-lon1);
-  a = np.sin(dLat/2) * np.sin(dLat/2) + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dLon/2) * np.sin(dLon/2)
-  c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
-  d = R * c
-  return d
+    R = 6371
+    dLat = np.radians(lat2-lat1)
+    dLon = np.radians(lon2-lon1);
+    a = np.sin(dLat/2) * np.sin(dLat/2) + np.cos(np.radians(lat1)) * np.cos(np.radians(lat2)) * np.sin(dLon/2) * np.sin(dLon/2)
+    c = 2 * np.arctan2(np.sqrt(a), np.sqrt(1-a))
+    d = R * c
+    return d
 
-
+def similar(a, b):
+    return SequenceMatcher(None, a, b).ratio()
 
 connectdb = mysql.connector.connect(
-  host="xxxxxxxx",
+  host="xxxxxxxxx",
   port="3306",
   user="admin",
   passwd="xxxxxxxxx",
@@ -115,9 +134,42 @@ class HospitalesSintomas(Resource):
         for h in hosp:
             dis = distancia(float(lat),float(lang), h["lat"], h["lng"])
             h["distancia"]=dis
-        hosp = sorted(hosp, key=lambda x: x["distancia"])
+        hosp = sorted(hosp, key=lambda x: x["distancia"])[:8]
 
-        return (lat,lang,sintomas,edad),201
+        palabras = []
+        [palabras.extend(s.lower().split(" ")) for s in sintomas]
+        sintomas = getSintomas(connectdb)
+
+        idSintomas=[]
+        for p in palabras:
+            for s in sintomas:
+                #print(p,s[1],similar(p,s[1]))
+                if similar(p,s[1])>0.8:
+                    idSintomas.append(s[0])
+                    sintomas.remove(s)
+
+        if len(idSintomas)>0:
+            especialidades=[]
+            for id in idSintomas:
+                especialidades.extend([esp[0] for esp in getEspecialidadesSintomas(connectdb,id)])
+
+            especialidad=max(set(especialidades), key = especialidades.count)
+
+
+            second=[]
+            for h in hosp:
+                esp = getEspecialidadesHospital(connectdb,h["id"])
+
+                if especialidad not in h:
+                    second.append(h)
+                    hosp.remove(h)
+            hosp.extend(second)
+
+
+        return hosp,201
+
+app = Flask(__name__)
+api = Api(app)
 
 @app.after_request
 def add_security_headers(resp):
