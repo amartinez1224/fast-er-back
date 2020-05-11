@@ -56,7 +56,8 @@ def insertEspecialidadesHospitales(connectdb):
       ("7","1"),
       ("8","1"),("8","4"),
       ("9","1"),
-      ("10","1"),("10","3")
+      ("10","1"),
+      ("11","1"),("10","3")
     ]
     db = connectdb.cursor()
     db.executemany(sql, val)
